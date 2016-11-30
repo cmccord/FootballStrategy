@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <style>
+
+      svg rect.background {
+        cursor: default !important;
+      }
+      rect.bordered {
+        stroke: #FFFFFF;
+        stroke-width:2px;
+      }
+      rect.bordered:hover {
+        stroke: #000000;
+        stroke-width:2px;   
+      }
+
+      text.mono {
+        font-size: 9pt;
+        font-family: Consolas, courier;
+        fill: #000;
+      }
+
+      text.axis-workweek {
+        fill: #000;
+      }
+
+      text.axis-worktime {
+        fill: #000;
+      }
+
+      text.slider-text {
+        font-size: 12pt;
+        font-family: Consolas, courier;
+      }
+
+      .axis {
+        font-size: 10pt;
+        font-family: Consolas, courier;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        user-select: none;
+      }
+
+      .axis .domain {
+        fill: none;
+        stroke: #000;
+        stroke-opacity: .3;
+        stroke-width: 10px;
+        stroke-linecap: round;
+      }
+
+      .axis .halo {
+        fill: none;
+        stroke: #ddd;
+        stroke-width: 8px;
+        stroke-linecap: round;
+      }
+
+      .slider .handle {
+        fill: #fff;
+        stroke: #000;
+        stroke-opacity: .5;
+        stroke-width: 1.25px;
+        pointer-events: none;
+      }
+
+      div.tooltip { 
+          position: absolute;     
+          text-align: left;     
+          width: 100px;          
+          height: 50px;         
+          padding: 6px;       
+          font: 12px sans-serif; 
+          font-weight: bold;   
+          background: #ffffff; 
+          border: 1px;
+          border-style: solid;
+          border-color: #000000;    
+          border-radius: 2px;     
+          pointer-events: none;     
+      }
+  
+    </style>
+    <script src="http://d3js.org/d3.v3.js"></script>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>CHANGE TITLE</title>
+
+    <!-- Bootstrap Core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="css/logo-nav.css" rel="stylesheet">
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+        <div class="container">
+            <!-- Brand and toggle get grouped for better mobile display -->
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <!-- <a class="navbar-brand" href="#">
+                    <img src="http://placehold.it/150x50&text=Logo" alt="">
+                </a> -->
+            </div>
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav">
+                    <li>
+                        <a href="#">Regulation Model</a>
+                    </li>
+                    <li>
+                        <a href="./ot/index.html">Overtime Model</a>
+                    </li>
+                    <li>
+                        <a href="./asymmetric/index.html">Asymmetric Model</a>
+                    </li>
+                </ul>
+            </div>
+            <!-- /.navbar-collapse -->
+        </div>
+        <!-- /.container -->
+    </nav>
+
+    <!-- Page Content -->
+    <div class="container">
+    <div id="main" class="content">
+        <div class="row">
+            <div class="col-lg-12">
+                <h1>Logo Nav by Start Bootstrap</h1>
+                <p>Note: You may need to adjust some CSS based on the size of your logo. The default logo size is 150x50 pixels.</p>
+            </div>
+        </div>
+    <div>
+    <div id="chart"></div>
+    <select id="selector" style="margin-left:60px">
+      <option value="0">You kick off to start 2nd half</option>
+      <option value="1">You receive 2nd half kickoff</option>
+    </select>
+    <figure class="figure">
+        <img src="2ptchart.png" id="image"/>
+    </figure>
+    </div>
+    </div>
+
+
+    <script type="text/javascript">
+      var margin = { top: 50, right: 30, bottom: 250, left: 60 },
+          width = 960 - margin.left - margin.right,
+          height = 500 - margin.top - margin.bottom,
+          buckets = 9,
+          numYardageZones = 10,
+          numFourthZones = 4,
+          gridMargin = 2,
+          gridWidth = Math.floor(width / numYardageZones - gridMargin),
+          gridHeight = Math.floor(height / numFourthZones - gridMargin),
+          legendElementWidth = gridWidth*2,
+          colors = ["#ffffd9","#edf8b1","#c7e9b4","#7fcdbb","#41b6c4","#1d91c0","#225ea8","#253494","#081d58"], // alternatively colorbrewer.YlGnBu[9]
+          fourthZones = ["1-2 yds", "3-5 yds", "6-8 yds", "9+ yds"],
+          fieldZones = ["G", "10", "20", "30", "40", "50", "40", "30", "20", "10", "G"],
+          choices = ["Punt", "Kick FG", "Go For It"],
+          puntColor = [1, 0, 0],
+          fgColor = [0,1,0],
+          goforColor = [0,0,1],
+          currentDataSet = "";
+          datasets = ["data/2-1.csv", "data2.tsv"];
+
+      function dataset_string(timeValue, scoreValue) {
+        var t = Math.round(timeValue) + 1;
+        if (selectorIndex == 1 && t >= 182) {
+          return "data_base/" + (Math.round(timeValue) + 1) + "-" + (Math.round(scoreValue) + 51) + "_opp.csv";
+        }
+        else {
+          return "data_base/" + (Math.round(timeValue) + 1) + "-" + (Math.round(scoreValue) + 51) + ".csv";
+        }
+      }
+
+      var x_score = d3.scale.linear()
+          .domain([-50, 50])
+          .range([0, width])
+          .clamp(true);
+
+      var brush_score = d3.svg.brush()
+          .x(x_score)
+          .extent([0, 0])
+          .on("brush", brushed_score);
+
+      var x_time = d3.scale.linear()
+          .domain([1, 360])
+          .range([0, width])
+          .clamp(true);
+
+      var brush_time = d3.svg.brush()
+          .x(x_time)
+          .extent([0, 0])
+          .on("brush", brushed_time);
+
+      // Define the div for the tooltip
+      var div = d3.select("body").append("div") 
+          .attr("class", "tooltip")       
+          .style("opacity", 0);
+
+      var svg = d3.select("#chart").append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+          .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+      var dayLabels = svg.selectAll(".dayLabel")
+          .data(fourthZones)
+          .enter().append("text")
+            .text(function (d) { return d; })
+            .attr("x", 0)
+            .attr("y", function (d, i) { return i * (gridHeight + gridMargin); })
+            .style("text-anchor", "end")
+            .attr("transform", "translate(-6," + gridHeight / 1.5 + ")")
+            .attr("class", "dayLabel mono axis axis-workweek");
+
+      var timeLabels = svg.selectAll(".timeLabel")
+          .data(fieldZones)
+          .enter().append("text")
+            .text(function(d) { return d; })
+            .attr("x", function(d, i) { return i * (gridWidth + gridMargin); })
+            .attr("y", 0)
+            .style("text-anchor", "middle")
+            .attr("transform", "translate(0, -6)")
+            .attr("class", "timelabel mono axis-worktime");
+
+      var timeLabelsBottom = svg.selectAll(".timeLabelBottom")
+          .data(fieldZones)
+          .enter().append("text")
+            .text(function(d) { return d; })
+            .attr("x", function(d, i) { return i * (gridWidth + gridMargin); })
+            .attr("y", height + 20)
+            .style("text-anchor", "middle")
+            .attr("transform", "translate(0, -6)")
+            .attr("class", "timelabel mono axis-worktime");
+
+      var formatString = function(fraction) {
+        var i = Math.round(100*fraction);
+        return i + "%";
+      }
+
+      var heatmapChart = function(csvFile) {
+        if(csvFile == currentDataSet) {
+          return;
+        }
+        d3.csv(csvFile,
+        function(d) {
+          return {
+            yard: +d.y,
+            fourthzone: +d.fzone,
+            punt: +d.punt,
+            kick: +d.kick,
+            gofor: +d.gofor,
+            red: +d.red,
+            green: +d.green,
+            blue: +d.blue
+          };
+        },
+        function(error, data) {
+          var colorScale = function(punt, kick, gofor) {
+            var norm = punt * puntColor[0] + kick * fgColor[0] + gofor * goforColor[0] + punt * puntColor[1] + kick * fgColor[1] + gofor * goforColor[1] + punt * puntColor[2] + kick * fgColor[2] + gofor * goforColor[2];
+            var r = Math.floor((punt * puntColor[0] + kick * fgColor[0] + gofor * goforColor[0]) * 255.0 / norm);
+            var g = Math.floor((punt * puntColor[1] + kick * fgColor[1] + gofor * goforColor[1]) * 255.0 / norm);
+            var b = Math.floor((punt * puntColor[2] + kick * fgColor[2] + gofor * goforColor[2]) * 255.0 / norm);
+            return "rgb(" + r + "," + g + "," + b + ")";
+          }
+
+          var cards = svg.selectAll(".hour")
+              .data(data, function(d) {return d.yard + ':' + d.fourthzone;});
+          console.log(cards);
+
+          //cards.append("title");
+
+          cards.enter().append("rect")
+              .attr("x", function(d) { return (d.yard - 1) * gridWidth + (d.yard-1)*gridMargin; })
+              .attr("y", function(d) { return (d.fourthzone - 1) * gridHeight + (d.fourthzone-1)*gridMargin; })
+              .attr("rx", 4)
+              .attr("ry", 4)
+              .attr("class", "hour bordered")
+              .attr("width", gridWidth)
+              .attr("height", gridHeight)
+              .style("fill", "#FFFFFF")
+              .on("mouseover", function(d) {    
+                  div.style("opacity", 1);    
+                  div.html("Punt: " + formatString(d.punt) + "<br/>" + "Kick FG: " + formatString(d.kick) + "<br/>Go for it: " + formatString(d.gofor))
+                  .style("left", (d3.event.pageX - 42) + "px")   
+                  .style("top", (d3.event.pageY - 45) + "px");
+              }).on("mouseout", function(d) {   
+                  div.style("opacity", 0); 
+              });
+
+          cards//.transition().duration(500)
+              .style("fill", function(d) { return (d.yard - 1 < numYardageZones && d.fourthzone - 1 < numFourthZones)//? ("rgb(" + d.red + "," + d.green + "," + d.blue + ")") : "#FFFFFF";});
+              ? colorScale(d.punt, d.kick, d.gofor) : "#FFFFFF";});
+
+          cards.select("title").text(function(d) { return d.yard; });
+          
+          cards.exit().remove();
+
+          currentDataSet = csvFile;
+
+        });  
+      };
+
+      var colorScale = function(punt, kick, gofor) {
+            var norm = punt * puntColor[0] + kick * fgColor[0] + gofor * goforColor[0] + punt * puntColor[1] + kick * fgColor[1] + gofor * goforColor[1] + punt * puntColor[2] + kick * fgColor[2] + gofor * goforColor[2];
+            var r = Math.floor((punt * puntColor[0] + kick * fgColor[0] + gofor * goforColor[0]) * 255.0 / norm);
+            var g = Math.floor((punt * puntColor[1] + kick * fgColor[1] + gofor * goforColor[1]) * 255.0 / norm);
+            var b = Math.floor((punt * puntColor[2] + kick * fgColor[2] + gofor * goforColor[2]) * 255.0 / norm);
+            return "rgb(" + r + "," + g + "," + b + ")";
+          }
+
+      var legend = svg.selectAll(".legend")
+              .data([0,1,2]);
+
+      legend.append("g")
+          .attr("class", "legend");
+
+      legend.enter().append("rect")
+        .attr("x", function(d, i) { return legendElementWidth * i; })
+        .attr("y", height + 50)
+        .attr("width", legendElementWidth)
+        .attr("height", gridHeight / 2)
+        .style("fill", function(d, i) { 
+          if(i == 0) {
+            return colorScale(1,0,0);
+          }
+          else if (i == 1) {
+            return colorScale(0,1,0);
+          }
+          return colorScale(0,0,1);
+        });
+          
+
+      legend.enter().append("text")
+        .attr("class", "mono")
+        .text(function(d, i) { return choices[i]; })
+        .attr("x", function(d, i) { return legendElementWidth * i + 10; })
+        .attr("y", height + gridHeight / 2 + 62);
+
+      legend.exit().remove();
+
+      var moving_score,
+        currentValue_score = 0,
+        targetValue_score = 0,
+        alpha = .2,
+        slider_score_y = height + gridHeight / 2 + 110,
+        moving_time,
+        currentValue_time = 180,
+        targetValue_time = 180,
+        slider_time_y = slider_score_y + 70,
+        selectorIndex = 0;
+
+      // https://bl.ocks.org/mbostock/6499018
+      // SCORE SLIDER
+      svg.append("g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0," + slider_score_y + ")")
+        .call(d3.svg.axis()
+          .scale(x_score)
+          .orient("bottom")
+          .tickFormat(function(d) { return (d > 0)? "+" + d: d; })
+          .tickSize(0)
+          .tickPadding(12))
+      .select(".domain")
+      .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
+        .attr("class", "halo");
+
+      var slider_score = svg.append("g")
+        .attr("class", "slider")
+        .call(brush_score);
+
+      var text_score = slider_score.append("text").attr("class", "slider-text").text("Score differential: 0")
+          .attr("transform", "translate(0," + (slider_score_y - 12) + ")");
+
+      slider_score.selectAll(".extent,.resize")
+          .remove();
+
+      slider_score.select(".background")
+          .attr("height", 50)
+          .attr("transform", "translate(0," + (slider_score_y - 10) + ")");
+
+      var handle_score = slider_score.append("circle")
+        .attr("class", "handle")
+        .attr("transform", "translate(0," + slider_score_y+ ")")
+        .attr("r", 9);
+
+      slider_score
+        .call(brush_score.extent([0, 0]))
+        .call(brush_score.event);
+
+      function brushed_score() {
+        if (d3.event.sourceEvent) { // not a programmatic event
+          targetValue_score = x_score.invert(d3.mouse(this)[0]);
+          move_score();
+        } else {
+          currentValue_score = brush_score.extent()[0];
+          handle_score.attr("cx", x_score(currentValue_score));
+          heatmapChart(dataset_string(currentValue_time,currentValue_score));
+          text_score.text(function() {
+            var displayValue = Math.round(currentValue_score);
+            if(displayValue > 0) {
+              return "Score differential: +" + displayValue;
+            }
+            return "Score differential: " + displayValue;
+          });
+        }
+      }
+
+      function move_score() {
+        if (moving_score) return false;
+        moving_score = true;
+        d3.timer(function() {
+          currentValue_score = Math.abs(currentValue_score - targetValue_score) < 1e-3
+              ? targetValue_score
+              : targetValue_score * alpha + currentValue_score * (1 - alpha);
+
+          slider_score
+              .call(brush_score.extent([currentValue_score, currentValue_score]))
+              .call(brush_score.event);
+
+          return !(moving_score = currentValue_score !== targetValue_score);
+        });
+      }
+
+      // TIME REMAINING SLIDER
+      svg.append("g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0," + slider_time_y + ")")
+        .call(d3.svg.axis()
+          .scale(x_time)
+          .orient("bottom")
+          .tickValues([1, 45, 90, 135, 180, 225, 270, 315, 360])
+          .tickFormat(function(d,i) { return (i % 2 == 0)? "|": ("Q" + (9-i) / 2); })
+          .tickSize(0)
+          .tickPadding(10))
+      .select(".domain")
+      .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
+        .attr("class", "halo");
+
+      var slider_time = svg.append("g")
+        .attr("class", "slider")
+        .call(brush_time);
+
+      var text_time = slider_time.append("text").attr("class", "slider-text").text("Time remaining: 0")
+          .attr("transform", "translate(0," + (slider_time_y - 12) + ")");
+
+      slider_time.selectAll(".extent,.resize")
+          .remove();
+
+      slider_time.select(".background")
+          .attr("height", 50)
+          .attr("transform", "translate(0," + (slider_time_y - 10) + ")");
+
+      var handle_time = slider_time.append("circle")
+        .attr("class", "handle")
+        .attr("transform", "translate(0," + slider_time_y+ ")")
+        .attr("r", 9);
+
+      slider_time
+        .call(brush_time.extent([currentValue_time, currentValue_time]))
+        .call(brush_time.event);
+
+      function brushed_time() {
+        if (d3.event.sourceEvent) { // not a programmatic event
+          targetValue_time = x_time.invert(d3.mouse(this)[0]);
+          move_time();
+        } else {
+          currentValue_time = brush_time.extent()[0];
+          handle_time.attr("cx", x_time(currentValue_time));
+          heatmapChart(dataset_string(currentValue_time,currentValue_score));
+          text_time.text(function() {
+            var displayValue = Math.round(currentValue_time);
+            var min = Math.floor((displayValue * 10) / 60) % 15;
+            var sec = (displayValue * 10) % 60;
+            if(min == 0 && sec == 0) {
+              min = 15;
+            }
+            var q = 4 - Math.floor((displayValue - 1) * 10 / 60 / 15);
+            return "Time remaining: " + min + ":" + ((sec == 0)? "00": sec) + " Q" + q;
+          });
+        }
+      }
+
+      function move_time() {
+        if (moving_time) return false;
+        moving_time = true;
+        d3.timer(function() {
+          currentValue_time = Math.abs(currentValue_time - targetValue_time) < 1e-3
+              ? targetValue_time
+              : targetValue_time * alpha + currentValue_time * (1 - alpha);
+
+          slider_time
+              .call(brush_time.extent([currentValue_time, currentValue_time]))
+              .call(brush_time.event);
+
+          return !(moving_time = currentValue_time !== targetValue_time);
+        });
+
+      }
+
+      // Pulldown Menu Selector
+      var selectorChanged = function() {
+        selectorIndex = d3.event.target.selectedIndex;
+        heatmapChart(dataset_string(currentValue_time, currentValue_score));
+        if(selectorIndex == 0) {
+          var _img = document.getElementById('image');
+          _img.src = './2ptchart.png';
+          var newImg = new Image;
+          newImg.onload = function() {
+              _img.src = this.src;
+          }
+          newImg.src = './2ptchart.png';
+        }
+        else {
+          var _img = document.getElementById('image');
+          var newImg = new Image;
+          newImg.onload = function() {
+              _img.src = this.src;
+          }
+          newImg.src = './2ptchart_opp.png';
+        }
+      }
+
+      d3.select("#selector").on("change", selectorChanged);
+      document.getElementById("selector").value = "0"
+
+    </script>
+    </div>
+    <!-- /.container -->
+
+    <!-- jQuery -->
+    <script src="js/jquery.js"></script>
+
+
+    <!-- Bootstrap Core JavaScript -->
+    <script src="js/bootstrap.min.js"></script>
+
+</body>
+
+</html>
